@@ -1,0 +1,16 @@
+{
+  "name": "abarrotech",
+  "version": "1.0.0",
+  "description": "Sistema de punto de venta e inventario para tiendas de abarrotes",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "node --experimental-sqlite server/index.js",
+    "client": "cd client && npm run dev",
+    "install:all": "cd server && npm install && cd ../client && npm install",
+    "build": "cd client && npm install --legacy-peer-deps && npm run build",
+    "start": "node --experimental-sqlite server/index.js"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
