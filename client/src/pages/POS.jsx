@@ -2,34 +2,59 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Scan, Grid3X3, Plus, Minus, Trash2, CreditCard, Banknote,
   ArrowLeftRight, CheckCircle, UserCircle, X, ShoppingBag,
-  Search, Camera, ChevronUp, Store, AlertTriangle
+  Search, Camera, ChevronUp, Store, AlertTriangle, Scale
 } from 'lucide-react';
 import Modal from '../components/Modal.jsx';
 import CameraScanner from '../components/CameraScanner.jsx';
+import WeightCalculator from '../components/WeightCalculator.jsx';
 import { useIsMobile } from '../hooks/useIsMobile.js';
+
+function fmtKg(qty) {
+  const grams = Math.round(qty * 1000);
+  if (grams < 1000) return `${grams}g`;
+  const k = parseFloat(qty.toFixed(3));
+  return `${k} kg`;
+}
 
 const API = '/api';
 const fmt = (n) => `$${Number(n).toFixed(2)}`;
 
 // Subcomponente: item en el ticket
 function TicketItem({ item, onQty, onRemove }) {
+  const isWeight = item.unit === 'kg';
   return (
     <div className="bg-orange-50 rounded-xl p-3 border border-orange-100">
       <div className="flex justify-between items-start mb-2">
-        <p className="font-semibold text-sm text-slate-800 leading-tight flex-1 pr-2">{item.product_name}</p>
+        <div className="flex-1 pr-2">
+          <p className="font-semibold text-sm text-slate-800 leading-tight">{item.product_name}</p>
+          {isWeight && (
+            <div className="flex items-center gap-1 mt-0.5">
+              <Scale size={10} className="text-brand-400" />
+              <span className="text-xs text-brand-500 font-medium">por peso</span>
+            </div>
+          )}
+        </div>
         <button onClick={() => onRemove(item.product_id)} className="text-red-400 hover:text-red-600 flex-shrink-0 p-0.5">
           <X size={14} />
         </button>
       </div>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <button onClick={() => onQty(item.product_id, -1)} className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center hover:bg-red-50 hover:border-red-200 transition-colors">
-            <Minus size={13} />
-          </button>
-          <span className="font-bold text-sm w-5 text-center">{item.quantity}</span>
-          <button onClick={() => onQty(item.product_id, 1)} className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center hover:bg-green-50 hover:border-green-200 transition-colors">
-            <Plus size={13} />
-          </button>
+          {isWeight ? (
+            <span className="bg-brand-100 text-brand-700 font-bold text-sm px-3 py-1 rounded-lg">
+              {fmtKg(item.quantity)}
+            </span>
+          ) : (
+            <>
+              <button onClick={() => onQty(item.product_id, -1)} className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center hover:bg-red-50 hover:border-red-200 transition-colors">
+                <Minus size={13} />
+              </button>
+              <span className="font-bold text-sm w-5 text-center">{item.quantity}</span>
+              <button onClick={() => onQty(item.product_id, 1)} className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center hover:bg-green-50 hover:border-green-200 transition-colors">
+                <Plus size={13} />
+              </button>
+            </>
+          )}
         </div>
         <p className="font-black text-brand-600 text-sm">{fmt(item.price * item.quantity)}</p>
       </div>
@@ -57,6 +82,7 @@ export default function POS() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showMobileTicket, setShowMobileTicket] = useState(false);
   const [showCameraModal, setShowCameraModal] = useState(false);
+  const [weightProduct, setWeightProduct] = useState(null);
   const [lastSale, setLastSale] = useState(null);
   const [payMethod, setPayMethod] = useState('efectivo');
   const [cashInput, setCashInput] = useState('');
@@ -66,7 +92,8 @@ export default function POS() {
   const scanLockRef = useRef(false); // evita doble procesamiento de un mismo scan
 
   const total = ticket.reduce((s, i) => s + i.price * i.quantity, 0);
-  const itemCount = ticket.reduce((s, i) => s + i.quantity, 0);
+  // Kg items cuentan como 1 línea; piezas cuentan por cantidad
+  const itemCount = ticket.reduce((s, i) => s + (i.unit === 'kg' ? 1 : i.quantity), 0);
 
   // Guardar ticket en localStorage cada vez que cambia
   useEffect(() => {
@@ -113,10 +140,15 @@ export default function POS() {
   }
 
   function addToTicket(product) {
-    // Bloquear producto agotado
     if (product.stock === 0) {
       setFlashProduct({ ...product, _stockError: 'agotado' });
       setTimeout(() => setFlashProduct(null), 2500);
+      return;
+    }
+
+    // Producto por peso → abrir calculadora
+    if (product.unit === 'kg') {
+      setWeightProduct(product);
       return;
     }
 
@@ -134,10 +166,30 @@ export default function POS() {
       if (existing) return prev.map(i => i.product_id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
       return [...prev, {
         product_id: product.id, product_name: product.name,
-        product_barcode: product.barcode, price: product.price, quantity: 1
+        product_barcode: product.barcode, price: product.price,
+        quantity: 1, unit: product.unit
       }];
     });
-    setFlashProduct(product); // se queda hasta el siguiente escaneo
+    setFlashProduct(product);
+  }
+
+  function addWeightToTicket(product, quantityKg) {
+    setTicket(prev => {
+      const existing = prev.find(i => i.product_id === product.id);
+      if (existing) {
+        return prev.map(i => i.product_id === product.id
+          ? { ...i, quantity: parseFloat((i.quantity + quantityKg).toFixed(6)) }
+          : i
+        );
+      }
+      return [...prev, {
+        product_id: product.id, product_name: product.name,
+        product_barcode: product.barcode, price: product.price,
+        quantity: quantityKg, unit: 'kg'
+      }];
+    });
+    setWeightProduct(null);
+    setFlashProduct({ ...product, _weightKg: quantityKg });
   }
 
   async function handleBarcodeFound(code) {
@@ -365,6 +417,15 @@ export default function POS() {
                     <p className="text-base font-semibold text-slate-700">{flashProduct.name}</p>
                     <p className="text-xs text-amber-600 mt-1 font-medium">Solo hay {flashProduct._disponible} en existencia</p>
                   </>
+                ) : flashProduct._weightKg ? (
+                  <>
+                    <p className="text-xl font-bold text-slate-800">{flashProduct.name}</p>
+                    <p className="text-3xl font-black text-brand-500 mt-1">
+                      {fmtKg(flashProduct._weightKg)}
+                    </p>
+                    <p className="text-lg font-bold text-slate-600">{fmt(flashProduct.price * flashProduct._weightKg)}</p>
+                    <p className="text-xs text-slate-400 mt-1">Agregado al ticket</p>
+                  </>
                 ) : (
                   <>
                     <p className="text-xl font-bold text-slate-800">{flashProduct.name}</p>
@@ -421,10 +482,15 @@ export default function POS() {
                       <ShoppingBag size={18} className="text-brand-500" />
                     </div>
                     <p className="font-semibold text-xs md:text-sm text-slate-800 leading-tight line-clamp-2">{product.name}</p>
-                    <p className="text-brand-600 font-black text-base md:text-lg mt-1">{fmt(product.price)}</p>
-                    <p className={`text-xs font-medium mt-0.5 ${product.stock <= product.min_stock ? 'text-red-400' : 'text-slate-400'}`}>
-                      {product.stock} {product.unit}
+                    <p className="text-brand-600 font-black text-base md:text-lg mt-1">
+                      {fmt(product.price)}{product.unit === 'kg' ? '/kg' : ''}
                     </p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      {product.unit === 'kg' && <Scale size={10} className="text-brand-400 flex-shrink-0" />}
+                      <p className={`text-xs font-medium ${product.stock <= product.min_stock ? 'text-red-400' : 'text-slate-400'}`}>
+                        {product.unit === 'kg' ? fmtKg(product.stock) : `${product.stock} ${product.unit}`}
+                      </p>
+                    </div>
                   </button>
                 ))}
                 {filteredProducts.length === 0 && (
@@ -509,6 +575,18 @@ export default function POS() {
           MODALES
       ══════════════════════════════════════════════ */}
 
+      {/* Calculadora de peso */}
+      <Modal open={!!weightProduct} onClose={() => setWeightProduct(null)} title="Venta por peso" size="sm">
+        {weightProduct && (
+          <WeightCalculator
+            product={weightProduct}
+            currentQtyKg={ticket.find(i => i.product_id === weightProduct.id)?.quantity || 0}
+            onAdd={(qty) => addWeightToTicket(weightProduct, qty)}
+            onClose={() => setWeightProduct(null)}
+          />
+        )}
+      </Modal>
+
       {/* Cámara */}
       <Modal open={showCameraModal} onClose={() => setShowCameraModal(false)} title="Escanear con cámara" size="sm">
         <CameraScanner
@@ -561,7 +639,10 @@ export default function POS() {
             <div className="space-y-1 max-h-36 overflow-y-auto">
               {ticket.map(i => (
                 <div key={i.product_id} className="flex justify-between text-sm">
-                  <span className="text-slate-600 truncate">{i.product_name} x{i.quantity}</span>
+                  <span className="text-slate-600 truncate">
+                    {i.product_name}&nbsp;
+                    {i.unit === 'kg' ? `× ${fmtKg(i.quantity)}` : `×${i.quantity}`}
+                  </span>
                   <span className="font-semibold ml-2 flex-shrink-0">{fmt(i.price * i.quantity)}</span>
                 </div>
               ))}
