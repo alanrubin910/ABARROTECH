@@ -6,6 +6,7 @@ import Reabastecimiento from './pages/Reabastecimiento.jsx';
 import CorteDeCaja from './pages/CorteDeCaja.jsx';
 import Reportes from './pages/Reportes.jsx';
 import Owner from './pages/Owner.jsx';
+import Guia from './pages/Guia.jsx';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
             <Route path="/corte" element={<CorteDeCaja />} />
             <Route path="/reportes" element={<Reportes />} />
             <Route path="/owner" element={<Owner />} />
+            <Route path="/guia" element={<Guia />} />
           </Routes>
         </main>
         <MobileBottomNav />

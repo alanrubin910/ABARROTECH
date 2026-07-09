@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { ShoppingCart, Package, Truck, Scissors, BarChart2, Store, KeyRound } from 'lucide-react';
+import { ShoppingCart, Package, Truck, Scissors, BarChart2, Store, KeyRound, BookOpen } from 'lucide-react';
 
 const nav = [
   { to: '/pos',              icon: ShoppingCart, label: 'Venta',    labelFull: 'Punto de Venta'   },
@@ -8,6 +8,7 @@ const nav = [
   { to: '/corte',           icon: Scissors,     label: 'Corte',    labelFull: 'Corte de Caja'     },
   { to: '/reportes',        icon: BarChart2,    label: 'Reportes', labelFull: 'Reportes'          },
   { to: '/owner',           icon: KeyRound,     label: 'Dueño',    labelFull: 'Panel del Dueño'   },
+  { to: '/guia',            icon: BookOpen,     label: 'Guía',     labelFull: 'Guía de uso'       },
 ];
 
 /* ── Desktop: sidebar izquierdo ─────────────────────────────── */
