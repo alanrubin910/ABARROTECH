@@ -22,10 +22,18 @@ router.get('/daily', (req, res) => {
         COALESCE(SUM(total), 0) as total_importe,
         COALESCE(SUM(CASE WHEN payment_method = 'efectivo' THEN total ELSE 0 END), 0) as efectivo,
         COALESCE(SUM(CASE WHEN payment_method = 'tarjeta' THEN total ELSE 0 END), 0) as tarjeta,
-        COALESCE(SUM(CASE WHEN payment_method = 'transferencia' THEN total ELSE 0 END), 0) as transferencia,
-        COALESCE(SUM(commission_amount), 0) as total_comisiones
+        COALESCE(SUM(CASE WHEN payment_method = 'transferencia' THEN total ELSE 0 END), 0) as transferencia
       FROM sales WHERE sale_date = ?
     `).get(targetDate);
+
+    // Separado para no romper el reporte si la columna no existe aún en la BD
+    let total_comisiones = 0;
+    try {
+      const commRow = db.prepare(
+        'SELECT COALESCE(SUM(commission_amount), 0) as val FROM sales WHERE sale_date = ?'
+      ).get(targetDate);
+      total_comisiones = commRow?.val || 0;
+    } catch { /* columna puede no existir en instancias antiguas */ }
 
     const profitRow = db.prepare(`
       SELECT COALESCE(SUM((si.price - COALESCE(p.cost_price, 0)) * si.quantity), 0) as ganancia
@@ -59,7 +67,7 @@ router.get('/daily', (req, res) => {
       ORDER BY hora
     `).all(targetDate);
 
-    res.json({ date: targetDate, summary: { ...summary, ganancia: profitRow?.ganancia || 0 }, topProducts, salesByHour });
+    res.json({ date: targetDate, summary: { ...summary, ganancia: profitRow?.ganancia || 0, total_comisiones }, topProducts, salesByHour });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
