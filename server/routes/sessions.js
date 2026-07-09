@@ -18,12 +18,48 @@ router.get('/', (req, res) => {
   }
 });
 
-// GET active sessions
+// GET active sessions — auto-cierra sesiones de días anteriores
 router.get('/active', (req, res) => {
   try {
+    const today = (() => {
+      const d = new Date();
+      return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+    })();
+
+    // Auto-cerrar sesiones abiertas de días anteriores
+    const stale = db.prepare(`
+      SELECT id FROM cashier_sessions
+      WHERE status = 'open' AND date(opened_at) < ?
+    `).all(today);
+
+    for (const s of stale) {
+      const totals = db.prepare(`
+        SELECT
+          COALESCE(SUM(total), 0) as total_sales,
+          COALESCE(SUM(CASE WHEN payment_method = 'efectivo' THEN total ELSE 0 END), 0) as total_cash,
+          COALESCE(SUM(CASE WHEN payment_method = 'tarjeta' THEN total ELSE 0 END), 0) as total_card,
+          COALESCE(SUM(CASE WHEN payment_method = 'transferencia' THEN total ELSE 0 END), 0) as total_transfer,
+          COUNT(*) as sale_count
+        FROM sales WHERE session_id = ?
+      `).get(s.id);
+
+      db.prepare(`
+        UPDATE cashier_sessions SET
+          status = 'closed',
+          closed_at = datetime('now', 'localtime'),
+          total_sales = ?, total_cash = ?, total_card = ?, total_transfer = ?, sale_count = ?
+        WHERE id = ?
+      `).run(totals.total_sales, totals.total_cash, totals.total_card, totals.total_transfer, totals.sale_count, s.id);
+    }
+
     const sessions = db.prepare(`
-      SELECT * FROM cashier_sessions WHERE status = 'open' ORDER BY opened_at ASC
-    `).all();
+      SELECT * FROM cashier_sessions
+      WHERE status = 'open' AND date(opened_at) = ?
+      ORDER BY opened_at ASC
+    `).all(today);
+
     res.json(sessions);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -102,6 +138,36 @@ router.put('/:id/close', (req, res) => {
 
     const updated = db.prepare('SELECT * FROM cashier_sessions WHERE id = ?').get(req.params.id);
     res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE session (solo cierra — no borra ventas asociadas)
+router.delete('/:id', (req, res) => {
+  try {
+    const session = db.prepare('SELECT * FROM cashier_sessions WHERE id = ?').get(req.params.id);
+    if (!session) return res.status(404).json({ error: 'Sesión no encontrada' });
+
+    const totals = db.prepare(`
+      SELECT
+        COALESCE(SUM(total), 0) as total_sales,
+        COALESCE(SUM(CASE WHEN payment_method = 'efectivo' THEN total ELSE 0 END), 0) as total_cash,
+        COALESCE(SUM(CASE WHEN payment_method = 'tarjeta' THEN total ELSE 0 END), 0) as total_card,
+        COALESCE(SUM(CASE WHEN payment_method = 'transferencia' THEN total ELSE 0 END), 0) as total_transfer,
+        COUNT(*) as sale_count
+      FROM sales WHERE session_id = ?
+    `).get(req.params.id);
+
+    db.prepare(`
+      UPDATE cashier_sessions SET
+        status = 'closed',
+        closed_at = datetime('now', 'localtime'),
+        total_sales = ?, total_cash = ?, total_card = ?, total_transfer = ?, sale_count = ?
+      WHERE id = ?
+    `).run(totals.total_sales, totals.total_cash, totals.total_card, totals.total_transfer, totals.sale_count, req.params.id);
+
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

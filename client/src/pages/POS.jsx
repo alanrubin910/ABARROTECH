@@ -746,16 +746,46 @@ export default function POS() {
         <div className="space-y-4">
           {sessions.length > 0 && (
             <div>
-              <p className="label">Cajeros activos</p>
+              <p className="label">Cajeros activos hoy</p>
               <div className="space-y-2">
                 {sessions.map(s => (
-                  <button key={s.id} onClick={() => { setActiveSession(s); setShowSessionModal(false); }}
-                    className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all ${
-                      activeSession?.id === s.id ? 'border-brand-500 bg-orange-50' : 'border-slate-200 hover:border-brand-300'
-                    }`}>
-                    <p className="font-bold text-slate-800">{s.cashier_name}</p>
-                    <p className="text-xs text-slate-400">Abierto: {s.opened_at}</p>
-                  </button>
+                  <div key={s.id} className={`rounded-xl border-2 overflow-hidden transition-all ${
+                    activeSession?.id === s.id ? 'border-brand-500' : 'border-slate-200'
+                  }`}>
+                    <button
+                      onClick={() => { setActiveSession(s); setShowSessionModal(false); }}
+                      className={`w-full text-left px-4 py-3 transition-all ${
+                        activeSession?.id === s.id ? 'bg-orange-50' : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      <p className="font-bold text-slate-800">{s.cashier_name}</p>
+                      <p className="text-xs text-slate-400">Abierto: {s.opened_at}</p>
+                    </button>
+                    <div className="flex border-t border-slate-100">
+                      <button
+                        onClick={async () => {
+                          await fetch(`${API}/sessions/${s.id}/close`, { method: 'PUT' });
+                          if (activeSession?.id === s.id) setActiveSession(null);
+                          fetchSessions();
+                        }}
+                        className="flex-1 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 transition-colors"
+                      >
+                        Cerrar caja
+                      </button>
+                      <div className="w-px bg-slate-100" />
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`¿Cerrar la caja de "${s.cashier_name}"?`)) return;
+                          await fetch(`${API}/sessions/${s.id}`, { method: 'DELETE' });
+                          if (activeSession?.id === s.id) setActiveSession(null);
+                          fetchSessions();
+                        }}
+                        className="flex-1 py-2 text-xs font-semibold text-red-400 hover:bg-red-50 transition-colors"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
