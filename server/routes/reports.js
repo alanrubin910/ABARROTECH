@@ -26,6 +26,14 @@ router.get('/daily', (req, res) => {
       FROM sales WHERE sale_date = ?
     `).get(targetDate);
 
+    const profitRow = db.prepare(`
+      SELECT COALESCE(SUM((si.price - COALESCE(p.cost_price, 0)) * si.quantity), 0) as ganancia
+      FROM sale_items si
+      JOIN sales s ON si.sale_id = s.id
+      LEFT JOIN products p ON si.product_id = p.id
+      WHERE s.sale_date = ?
+    `).get(targetDate);
+
     const topProducts = db.prepare(`
       SELECT
         si.product_name,
@@ -50,7 +58,7 @@ router.get('/daily', (req, res) => {
       ORDER BY hora
     `).all(targetDate);
 
-    res.json({ date: targetDate, summary, topProducts, salesByHour });
+    res.json({ date: targetDate, summary: { ...summary, ganancia: profitRow?.ganancia || 0 }, topProducts, salesByHour });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

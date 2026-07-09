@@ -105,4 +105,7 @@ db.exec(`
   );
 `);
 
+// Migración: agregar columna cost_price si no existe
+try { db.exec('ALTER TABLE products ADD COLUMN cost_price REAL DEFAULT 0'); } catch {}
+
 module.exports = db;

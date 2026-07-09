@@ -11,7 +11,7 @@ const fmt = (n) => `$${Number(n).toFixed(2)}`;
 const UNITS = ['pieza', 'kg', 'litro', 'caja', 'bolsa', 'docena', 'par'];
 const CATEGORIES = ['General', 'Bebidas', 'Lácteos', 'Panadería', 'Botanas', 'Dulces', 'Limpieza', 'Higiene personal', 'Frutas y Verduras', 'Carnes', 'Enlatados', 'Abarrotes'];
 
-const EMPTY_FORM = { name: '', price: '', barcode: '', stock: '', min_stock: '5', unit: 'pieza', category: 'General' };
+const EMPTY_FORM = { name: '', price: '', cost_price: '', barcode: '', stock: '', min_stock: '5', unit: 'pieza', category: 'General' };
 
 function StockBadge({ product }) {
   if (product.stock === 0) return <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full">Agotado</span>;
@@ -60,6 +60,7 @@ export default function Almacen() {
     setEditProduct(product);
     setForm({
       name: product.name, price: String(product.price),
+      cost_price: product.cost_price ? String(product.cost_price) : '',
       barcode: product.barcode || '', stock: String(product.stock),
       min_stock: String(product.min_stock), unit: product.unit, category: product.category
     });
@@ -71,6 +72,7 @@ export default function Almacen() {
     setSaving(true); setError('');
     const body = {
       name: form.name.trim(), price: parseFloat(form.price),
+      cost_price: parseFloat(form.cost_price) || 0,
       barcode: form.barcode.trim() || null, stock: parseInt(form.stock) || 0,
       min_stock: parseInt(form.min_stock) || 5, unit: form.unit, category: form.category
     };
@@ -203,6 +205,9 @@ export default function Almacen() {
             </div>
             <div className="text-right flex-shrink-0">
               <p className="font-black text-brand-600 text-base">{fmt(product.price)}</p>
+              {product.cost_price > 0 && (
+                <p className="text-xs text-green-600 font-semibold">+{fmt(product.price - product.cost_price)}</p>
+              )}
               <div className="flex gap-1 mt-1 justify-end">
                 <button onClick={() => setBatchProduct(product)} className="p-1.5 hover:bg-purple-100 text-purple-600 rounded-lg" title="Lotes">
                   <Layers size={13} />
@@ -235,6 +240,7 @@ export default function Almacen() {
                 <th className="px-4 py-3 text-left">Código</th>
                 <th className="px-4 py-3 text-left">Categoría</th>
                 <th className="px-4 py-3 text-right">Precio</th>
+                <th className="px-4 py-3 text-right">Margen</th>
                 <th className="px-4 py-3 text-center">Stock</th>
                 <th className="px-4 py-3 text-center">Estado</th>
                 <th className="px-4 py-3 text-center">Acciones</th>
@@ -250,6 +256,13 @@ export default function Almacen() {
                   <td className="px-4 py-3"><span className="font-mono text-xs bg-slate-100 px-2 py-0.5 rounded">{product.barcode || '—'}</span></td>
                   <td className="px-4 py-3 text-slate-600">{product.category}</td>
                   <td className="px-4 py-3 text-right font-black text-brand-600">{fmt(product.price)}</td>
+                  <td className="px-4 py-3 text-right">
+                    {product.cost_price > 0 ? (
+                      <span className="text-green-600 font-bold text-sm">+{fmt(product.price - product.cost_price)}</span>
+                    ) : (
+                      <span className="text-slate-300 text-xs">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-center font-bold text-slate-700">{product.stock}</td>
                   <td className="px-4 py-3 text-center"><StockBadge product={product} /></td>
                   <td className="px-4 py-3">
@@ -262,7 +275,7 @@ export default function Almacen() {
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={7} className="py-12 text-center text-slate-400"><Package size={32} className="mx-auto mb-2 opacity-30" /><p>No hay productos</p></td></tr>
+                <tr><td colSpan={8} className="py-12 text-center text-slate-400"><Package size={32} className="mx-auto mb-2 opacity-30" /><p>No hay productos</p></td></tr>
               )}
             </tbody>
           </table>
@@ -287,10 +300,19 @@ export default function Almacen() {
               <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input" placeholder="Ej: Coca-Cola 355ml" />
             </div>
             <div>
-              <label className="label">Precio *</label>
+              <label className="label">Precio de venta *</label>
               <input value={form.price} onChange={e => setForm({...form, price: e.target.value})} type="number" step="0.01" className="input" placeholder="0.00" />
             </div>
             <div>
+              <label className="label">Precio de costo <span className="text-slate-400 font-normal text-xs">(proveedor)</span></label>
+              <input value={form.cost_price} onChange={e => setForm({...form, cost_price: e.target.value})} type="number" step="0.01" className="input" placeholder="0.00" />
+              {form.price && form.cost_price && parseFloat(form.price) > 0 && (
+                <p className="text-xs text-green-600 font-semibold mt-1">
+                  Ganancia: ${(parseFloat(form.price) - parseFloat(form.cost_price || 0)).toFixed(2)} por {form.unit || 'pieza'}
+                </p>
+              )}
+            </div>
+            <div className="col-span-2">
               <label className="label">Código de barras</label>
               <div className="flex gap-2">
                 <input value={form.barcode} onChange={e => setForm({...form, barcode: e.target.value})} className="input font-mono text-sm flex-1" placeholder="Escanea o escribe" />

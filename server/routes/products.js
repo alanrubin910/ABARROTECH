@@ -64,14 +64,14 @@ router.get('/:id', (req, res) => {
 // POST create product
 router.post('/', (req, res) => {
   try {
-    const { name, price, barcode, stock, min_stock, unit, category } = req.body;
+    const { name, price, barcode, stock, min_stock, unit, category, cost_price } = req.body;
     if (!name || price === undefined) {
       return res.status(400).json({ error: 'Nombre y precio son requeridos' });
     }
     const result = db.prepare(`
-      INSERT INTO products (name, price, barcode, stock, min_stock, unit, category)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(name, price, barcode || null, stock || 0, min_stock || 5, unit || 'pieza', category || 'General');
+      INSERT INTO products (name, price, barcode, stock, min_stock, unit, category, cost_price)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(name, price, barcode || null, stock || 0, min_stock || 5, unit || 'pieza', category || 'General', cost_price || 0);
 
     const product = db.prepare('SELECT * FROM products WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json(product);
@@ -86,7 +86,7 @@ router.post('/', (req, res) => {
 // PUT update product
 router.put('/:id', (req, res) => {
   try {
-    const { name, price, barcode, stock, min_stock, unit, category } = req.body;
+    const { name, price, barcode, stock, min_stock, unit, category, cost_price } = req.body;
     db.prepare(`
       UPDATE products SET
         name = COALESCE(?, name),
@@ -96,9 +96,10 @@ router.put('/:id', (req, res) => {
         min_stock = COALESCE(?, min_stock),
         unit = COALESCE(?, unit),
         category = COALESCE(?, category),
+        cost_price = COALESCE(?, cost_price),
         updated_at = datetime('now', 'localtime')
       WHERE id = ?
-    `).run(name, price, barcode, stock, min_stock, unit, category, req.params.id);
+    `).run(name, price, barcode, stock, min_stock, unit, category, cost_price ?? null, req.params.id);
 
     const product = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
     res.json(product);

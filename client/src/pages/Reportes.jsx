@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BarChart2, TrendingUp, ShoppingBag, Banknote, CreditCard, ArrowLeftRight, Calendar } from 'lucide-react';
+import { BarChart2, TrendingUp, ShoppingBag, Banknote, CreditCard, ArrowLeftRight, Calendar, DollarSign } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 const API = '/api';
@@ -77,12 +77,13 @@ export default function Reportes() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {[
           { label: 'Ventas totales', value: fmt(s.total_importe || 0), sub: `${s.total_ventas || 0} transacciones`, icon: TrendingUp, color: 'bg-brand-500' },
           { label: 'Efectivo', value: fmt(s.efectivo || 0), sub: 'en caja', icon: Banknote, color: 'bg-green-500' },
           { label: 'Tarjeta', value: fmt(s.tarjeta || 0), sub: 'con terminal', icon: CreditCard, color: 'bg-blue-500' },
           { label: 'Transferencia', value: fmt(s.transferencia || 0), sub: 'digitales', icon: ArrowLeftRight, color: 'bg-purple-500' },
+          { label: 'Ganancia estimada', value: fmt(s.ganancia || 0), sub: 'venta − costo proveedor', icon: DollarSign, color: 'bg-emerald-500' },
         ].map(({ label, value, sub, icon: Icon, color }) => (
           <div key={label} className="card">
             <div className={`w-10 h-10 ${color} rounded-xl flex items-center justify-center mb-3`}>
