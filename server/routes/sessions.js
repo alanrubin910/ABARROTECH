@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
+const { localDateStr, localDateTimeStr } = require('../utils/date');
 
 // GET all sessions (today)
 router.get('/', (req, res) => {
   try {
     const { date } = req.query;
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = date || localDateStr();
     const sessions = db.prepare(`
       SELECT * FROM cashier_sessions
       WHERE date(opened_at) = ?
@@ -18,15 +19,10 @@ router.get('/', (req, res) => {
   }
 });
 
-// GET active sessions — auto-cierra sesiones de días anteriores
+// GET active sessions — auto-cierra sesiones de días anteriores (usando hora México)
 router.get('/active', (req, res) => {
   try {
-    const today = (() => {
-      const d = new Date();
-      return d.getFullYear() + '-' +
-        String(d.getMonth() + 1).padStart(2, '0') + '-' +
-        String(d.getDate()).padStart(2, '0');
-    })();
+    const today = localDateStr();
 
     // Auto-cerrar sesiones abiertas de días anteriores
     const stale = db.prepare(`
@@ -47,11 +43,10 @@ router.get('/active', (req, res) => {
 
       db.prepare(`
         UPDATE cashier_sessions SET
-          status = 'closed',
-          closed_at = datetime('now', 'localtime'),
+          status = 'closed', closed_at = ?,
           total_sales = ?, total_cash = ?, total_card = ?, total_transfer = ?, sale_count = ?
         WHERE id = ?
-      `).run(totals.total_sales, totals.total_cash, totals.total_card, totals.total_transfer, totals.sale_count, s.id);
+      `).run(localDateTimeStr(), totals.total_sales, totals.total_cash, totals.total_card, totals.total_transfer, totals.sale_count, s.id);
     }
 
     const sessions = db.prepare(`
@@ -91,10 +86,11 @@ router.post('/', (req, res) => {
       return res.status(409).json({ error: 'Este cajero ya tiene una sesión abierta', session_id: existing.id });
     }
 
+    // Insertar con fecha/hora de México explícita
     const result = db.prepare(`
-      INSERT INTO cashier_sessions (cashier_name, opening_cash)
-      VALUES (?, ?)
-    `).run(cashier_name, opening_cash || 0);
+      INSERT INTO cashier_sessions (cashier_name, opening_cash, opened_at)
+      VALUES (?, ?, ?)
+    `).run(cashier_name, opening_cash || 0, localDateTimeStr());
 
     const session = db.prepare('SELECT * FROM cashier_sessions WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json(session);
@@ -109,7 +105,6 @@ router.put('/:id/close', (req, res) => {
     const session = db.prepare('SELECT * FROM cashier_sessions WHERE id = ?').get(req.params.id);
     if (!session) return res.status(404).json({ error: 'Sesión no encontrada' });
 
-    // Calculate totals from sales
     const totals = db.prepare(`
       SELECT
         COALESCE(SUM(total), 0) as total_sales,
@@ -122,15 +117,11 @@ router.put('/:id/close', (req, res) => {
 
     db.prepare(`
       UPDATE cashier_sessions SET
-        status = 'closed',
-        closed_at = datetime('now', 'localtime'),
-        total_sales = ?,
-        total_cash = ?,
-        total_card = ?,
-        total_transfer = ?,
-        sale_count = ?
+        status = 'closed', closed_at = ?,
+        total_sales = ?, total_cash = ?, total_card = ?, total_transfer = ?, sale_count = ?
       WHERE id = ?
     `).run(
+      localDateTimeStr(),
       totals.total_sales, totals.total_cash,
       totals.total_card, totals.total_transfer,
       totals.sale_count, req.params.id
@@ -143,7 +134,7 @@ router.put('/:id/close', (req, res) => {
   }
 });
 
-// DELETE session (solo cierra — no borra ventas asociadas)
+// DELETE session (cierra la caja — conserva las ventas asociadas)
 router.delete('/:id', (req, res) => {
   try {
     const session = db.prepare('SELECT * FROM cashier_sessions WHERE id = ?').get(req.params.id);
@@ -161,11 +152,10 @@ router.delete('/:id', (req, res) => {
 
     db.prepare(`
       UPDATE cashier_sessions SET
-        status = 'closed',
-        closed_at = datetime('now', 'localtime'),
+        status = 'closed', closed_at = ?,
         total_sales = ?, total_cash = ?, total_card = ?, total_transfer = ?, sale_count = ?
       WHERE id = ?
-    `).run(totals.total_sales, totals.total_cash, totals.total_card, totals.total_transfer, totals.sale_count, req.params.id);
+    `).run(localDateTimeStr(), totals.total_sales, totals.total_cash, totals.total_card, totals.total_transfer, totals.sale_count, req.params.id);
 
     res.json({ ok: true });
   } catch (err) {

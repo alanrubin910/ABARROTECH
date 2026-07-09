@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
+const { localDateStr, localDateTimeStr } = require('../utils/date');
 
 router.get('/', (req, res) => {
   try {
@@ -68,10 +69,11 @@ router.post('/', (req, res) => {
     try {
       const saleResult = db.prepare(`
         INSERT INTO sales (session_id, cashier_name, payment_method, total, cash_received, change_given, transfer_ref,
-                          commission_rate, commission_amount, terminal_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          commission_rate, commission_amount, terminal_name, sale_date, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(session_id, cashier_name, payment_method || 'efectivo', total, cash_received || null, change_given, transfer_ref || null,
-             parseFloat(commission_rate) || 0, commAmt, terminal_name || null);
+             parseFloat(commission_rate) || 0, commAmt, terminal_name || null,
+             localDateStr(), localDateTimeStr());
 
       const saleId = saleResult.lastInsertRowid;
 

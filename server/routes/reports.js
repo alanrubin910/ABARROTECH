@@ -1,14 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
-
-// Fecha local en formato YYYY-MM-DD (evita el bug de toISOString que usa UTC)
-function localDateStr() {
-  const d = new Date();
-  return d.getFullYear() + '-' +
-    String(d.getMonth() + 1).padStart(2, '0') + '-' +
-    String(d.getDate()).padStart(2, '0');
-}
+const { localDateStr } = require('../utils/date');
 
 // GET daily summary
 router.get('/daily', (req, res) => {
