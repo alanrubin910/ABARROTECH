@@ -2,18 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Scan, Grid3X3, Plus, Minus, Trash2, CreditCard, Banknote,
   ArrowLeftRight, CheckCircle, UserCircle, X, ShoppingBag,
-  Search, Camera, ChevronUp, Store, AlertTriangle, Scale, Settings, Percent
+  Search, Camera, ChevronUp, Store, AlertTriangle, Scale, Settings, Percent, Edit2, Check
 } from 'lucide-react';
 import Modal from '../components/Modal.jsx';
 import CameraScanner from '../components/CameraScanner.jsx';
 import WeightCalculator from '../components/WeightCalculator.jsx';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 
-const DEFAULT_TERMINALS = [
-  { id: 1, name: 'BBVA',          rate: 2.5  },
-  { id: 2, name: 'Clip',          rate: 3.6  },
-  { id: 3, name: 'Mercado Pago',  rate: 3.49 },
-];
+const DEFAULT_TERMINALS = [];
 
 function fmtKg(qty) {
   const grams = Math.round(qty * 1000);
@@ -105,6 +101,7 @@ export default function POS() {
   const [selectedTerminal, setSelectedTerminal] = useState(null);
   const [showTerminalManager, setShowTerminalManager] = useState(false);
   const [newTerminalForm, setNewTerminalForm] = useState({ name: '', rate: '' });
+  const [editingTerminal, setEditingTerminal] = useState(null); // { id, name, rate }
   const scanRef = useRef(null);
   const scanLockRef = useRef(false); // evita doble procesamiento de un mismo scan
 
@@ -599,36 +596,97 @@ export default function POS() {
       ══════════════════════════════════════════════ */}
 
       {/* Gestión de terminales */}
-      <Modal open={showTerminalManager} onClose={() => { setShowTerminalManager(false); setNewTerminalForm({ name: '', rate: '' }); }} title="Mis terminales" size="sm">
-        <div className="space-y-4">
+      <Modal open={showTerminalManager} onClose={() => { setShowTerminalManager(false); setNewTerminalForm({ name: '', rate: '' }); setEditingTerminal(null); }} title="Mis terminales" size="sm">
+        <div className="space-y-3">
           {terminals.length === 0 ? (
-            <p className="text-slate-400 text-sm text-center py-3">Sin terminales. Agrega una abajo.</p>
+            <p className="text-slate-400 text-sm text-center py-3">Aún no tienes terminales. Agrega una abajo.</p>
           ) : (
             <div className="space-y-2">
               {terminals.map(t => (
-                <div key={t.id} className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3 border border-slate-100">
-                  <div>
-                    <p className="font-bold text-slate-800">{t.name}</p>
-                    <p className="text-xs text-slate-500 flex items-center gap-0.5"><Percent size={10} />{t.rate} comisión</p>
-                  </div>
-                  <button onClick={() => {
-                    setTerminals(prev => prev.filter(x => x.id !== t.id));
-                    if (selectedTerminal?.id === t.id) setSelectedTerminal(null);
-                  }} className="p-1.5 hover:bg-red-100 text-red-400 hover:text-red-600 rounded-lg transition-colors">
-                    <Trash2 size={15} />
-                  </button>
+                <div key={t.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                  {editingTerminal?.id === t.id ? (
+                    /* ── Modo edición ── */
+                    <div className="p-3 space-y-2 bg-orange-50">
+                      <div className="flex gap-2">
+                        <input
+                          value={editingTerminal.name}
+                          onChange={e => setEditingTerminal(et => ({ ...et, name: e.target.value }))}
+                          placeholder="Nombre"
+                          className="input flex-1 text-sm"
+                          autoFocus
+                        />
+                        <div className="relative w-24 flex-shrink-0">
+                          <input
+                            value={editingTerminal.rate}
+                            onChange={e => setEditingTerminal(et => ({ ...et, rate: e.target.value }))}
+                            type="number" step="0.01" placeholder="3.5"
+                            className="input text-sm text-center pr-5"
+                          />
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">%</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditingTerminal(null)}
+                          className="btn-secondary flex-1 py-1.5 text-sm">
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={() => {
+                            const name = editingTerminal.name.trim();
+                            const rate = parseFloat(editingTerminal.rate);
+                            if (!name || !rate || rate <= 0) return;
+                            setTerminals(prev => prev.map(x =>
+                              x.id === t.id ? { ...x, name, rate } : x
+                            ));
+                            if (selectedTerminal?.id === t.id) setSelectedTerminal({ ...t, name, rate });
+                            setEditingTerminal(null);
+                          }}
+                          disabled={!editingTerminal.name.trim() || !editingTerminal.rate}
+                          className="btn-primary flex-1 py-1.5 text-sm flex items-center justify-center gap-1 disabled:opacity-50">
+                          <Check size={14} /> Guardar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* ── Modo vista ── */
+                    <div className="flex items-center justify-between px-4 py-3 bg-slate-50">
+                      <div>
+                        <p className="font-bold text-slate-800">{t.name}</p>
+                        <p className="text-xs text-slate-500 flex items-center gap-0.5">
+                          <Percent size={10} /> {t.rate}% de comisión
+                        </p>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => setEditingTerminal({ id: t.id, name: t.name, rate: String(t.rate) })}
+                          className="p-1.5 hover:bg-brand-100 text-brand-500 rounded-lg transition-colors" title="Editar">
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setTerminals(prev => prev.filter(x => x.id !== t.id));
+                            if (selectedTerminal?.id === t.id) setSelectedTerminal(null);
+                          }}
+                          className="p-1.5 hover:bg-red-100 text-red-400 hover:text-red-600 rounded-lg transition-colors" title="Eliminar">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
 
-          <div className="border border-slate-200 rounded-xl p-3 space-y-2 bg-orange-50/40">
+          {/* Formulario para agregar */}
+          <div className="border border-orange-200 rounded-xl p-3 space-y-2 bg-orange-50/40">
             <p className="text-sm font-bold text-slate-600">Agregar terminal</p>
             <div className="flex gap-2">
               <input
                 value={newTerminalForm.name}
                 onChange={e => setNewTerminalForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="Nombre (ej: BBVA)"
+                placeholder="Nombre (ej: mi terminal)"
                 className="input flex-1 text-sm"
               />
               <div className="relative w-24 flex-shrink-0">
@@ -654,7 +712,7 @@ export default function POS() {
               disabled={!newTerminalForm.name.trim() || !newTerminalForm.rate}
               className="btn-primary w-full text-sm py-2 disabled:opacity-50"
             >
-              Agregar terminal
+              Guardar terminal
             </button>
           </div>
         </div>
