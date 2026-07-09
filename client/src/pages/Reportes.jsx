@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BarChart2, TrendingUp, ShoppingBag, Banknote, CreditCard, ArrowLeftRight, Calendar, DollarSign } from 'lucide-react';
+import { BarChart2, TrendingUp, ShoppingBag, Banknote, CreditCard, ArrowLeftRight, Calendar, DollarSign, Percent } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 const API = '/api';
@@ -84,6 +84,7 @@ export default function Reportes() {
           { label: 'Tarjeta', value: fmt(s.tarjeta || 0), sub: 'con terminal', icon: CreditCard, color: 'bg-blue-500' },
           { label: 'Transferencia', value: fmt(s.transferencia || 0), sub: 'digitales', icon: ArrowLeftRight, color: 'bg-purple-500' },
           { label: 'Ganancia estimada', value: fmt(s.ganancia || 0), sub: 'venta − costo proveedor', icon: DollarSign, color: 'bg-emerald-500' },
+          { label: 'Comisiones tarjeta', value: fmt(s.total_comisiones || 0), sub: 'cobradas al cliente', icon: Percent, color: 'bg-orange-500' },
         ].map(({ label, value, sub, icon: Icon, color }) => (
           <div key={label} className="card">
             <div className={`w-10 h-10 ${color} rounded-xl flex items-center justify-center mb-3`}>
