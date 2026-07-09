@@ -15,6 +15,9 @@ app.use('/api/sessions', require('./routes/sessions'));
 app.use('/api/restocking', require('./routes/restocking'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/batches', require('./routes/batches'));
+app.use('/api/owner', require('./routes/owner'));
+app.use('/api/employees', require('./routes/employees'));
+app.use('/api/expenses', require('./routes/expenses'));
 
 // Serve client in production
 const clientDist = path.join(__dirname, '../client/dist');

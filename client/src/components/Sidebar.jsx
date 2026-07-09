@@ -1,12 +1,13 @@
 import { NavLink } from 'react-router-dom';
-import { ShoppingCart, Package, Truck, Scissors, BarChart2, Store } from 'lucide-react';
+import { ShoppingCart, Package, Truck, Scissors, BarChart2, Store, KeyRound } from 'lucide-react';
 
 const nav = [
-  { to: '/pos',              icon: ShoppingCart, label: 'Venta',           labelFull: 'Punto de Venta'   },
-  { to: '/almacen',         icon: Package,      label: 'Almacén',         labelFull: 'Almacén'           },
-  { to: '/reabastecimiento', icon: Truck,        label: 'Pedidos',         labelFull: 'Reabastecimiento'  },
-  { to: '/corte',           icon: Scissors,     label: 'Corte',           labelFull: 'Corte de Caja'     },
-  { to: '/reportes',        icon: BarChart2,    label: 'Reportes',        labelFull: 'Reportes'          },
+  { to: '/pos',              icon: ShoppingCart, label: 'Venta',    labelFull: 'Punto de Venta'   },
+  { to: '/almacen',         icon: Package,      label: 'Almacén',  labelFull: 'Almacén'           },
+  { to: '/reabastecimiento', icon: Truck,        label: 'Pedidos',  labelFull: 'Reabastecimiento'  },
+  { to: '/corte',           icon: Scissors,     label: 'Corte',    labelFull: 'Corte de Caja'     },
+  { to: '/reportes',        icon: BarChart2,    label: 'Reportes', labelFull: 'Reportes'          },
+  { to: '/owner',           icon: KeyRound,     label: 'Dueño',    labelFull: 'Panel del Dueño'   },
 ];
 
 /* ── Desktop: sidebar izquierdo ─────────────────────────────── */

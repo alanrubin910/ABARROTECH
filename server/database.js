@@ -103,7 +103,48 @@ db.exec(`
     notes TEXT,
     created_at TEXT DEFAULT (datetime('now', 'localtime'))
   );
+
+  CREATE TABLE IF NOT EXISTS owner_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS employees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    position TEXT DEFAULT '',
+    salary_type TEXT DEFAULT 'weekly',
+    base_salary REAL DEFAULT 0,
+    active INTEGER DEFAULT 1,
+    created_at TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS payroll_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER REFERENCES employees(id),
+    employee_name TEXT NOT NULL,
+    period_start TEXT,
+    period_end TEXT,
+    days_worked INTEGER DEFAULT 0,
+    base_amount REAL DEFAULT 0,
+    amount_paid REAL NOT NULL,
+    notes TEXT,
+    paid_at TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    amount REAL NOT NULL,
+    expense_date TEXT,
+    notes TEXT DEFAULT '',
+    created_at TEXT
+  );
 `);
+
+// Seed default PIN if not present
+try { db.prepare("INSERT OR IGNORE INTO owner_settings (key, value) VALUES ('pin', '1234')").run(); } catch {}
 
 // Migraciones incrementales (seguras si ya existen)
 try { db.exec('ALTER TABLE products ADD COLUMN cost_price REAL DEFAULT 0'); } catch {}
