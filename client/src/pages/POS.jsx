@@ -85,6 +85,7 @@ export default function POS() {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [weightProduct, setWeightProduct] = useState(null);
+  const [confirmCloseSession, setConfirmCloseSession] = useState(null); // id de sesión a cerrar
   const [lastSale, setLastSale] = useState(null);
   const [payMethod, setPayMethod] = useState('efectivo');
   const [cashInput, setCashInput] = useState('');
@@ -752,8 +753,9 @@ export default function POS() {
                   <div key={s.id} className={`rounded-xl border-2 overflow-hidden transition-all ${
                     activeSession?.id === s.id ? 'border-brand-500' : 'border-slate-200'
                   }`}>
+                    {/* Fila principal — seleccionar cajero */}
                     <button
-                      onClick={() => { setActiveSession(s); setShowSessionModal(false); }}
+                      onClick={() => { setActiveSession(s); setConfirmCloseSession(null); setShowSessionModal(false); }}
                       className={`w-full text-left px-4 py-3 transition-all ${
                         activeSession?.id === s.id ? 'bg-orange-50' : 'hover:bg-slate-50'
                       }`}
@@ -761,30 +763,53 @@ export default function POS() {
                       <p className="font-bold text-slate-800">{s.cashier_name}</p>
                       <p className="text-xs text-slate-400">Abierto: {s.opened_at}</p>
                     </button>
-                    <div className="flex border-t border-slate-100">
-                      <button
-                        onClick={async () => {
-                          await fetch(`${API}/sessions/${s.id}/close`, { method: 'PUT' });
-                          if (activeSession?.id === s.id) setActiveSession(null);
-                          fetchSessions();
-                        }}
-                        className="flex-1 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 transition-colors"
-                      >
-                        Cerrar caja
-                      </button>
-                      <div className="w-px bg-slate-100" />
-                      <button
-                        onClick={async () => {
-                          if (!confirm(`¿Cerrar la caja de "${s.cashier_name}"?`)) return;
-                          await fetch(`${API}/sessions/${s.id}`, { method: 'DELETE' });
-                          if (activeSession?.id === s.id) setActiveSession(null);
-                          fetchSessions();
-                        }}
-                        className="flex-1 py-2 text-xs font-semibold text-red-400 hover:bg-red-50 transition-colors"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
+
+                    {/* Acciones */}
+                    {confirmCloseSession === s.id ? (
+                      /* Confirmación inline — sin confirm() */
+                      <div className="flex border-t border-red-200 bg-red-50">
+                        <span className="flex-1 px-3 py-2 text-xs text-red-600 font-semibold flex items-center">
+                          ¿Cerrar caja de {s.cashier_name}?
+                        </span>
+                        <button
+                          onClick={() => setConfirmCloseSession(null)}
+                          className="px-3 py-2 text-xs text-slate-500 hover:bg-slate-100 transition-colors border-l border-red-200"
+                        >
+                          No
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setConfirmCloseSession(null);
+                            await fetch(`${API}/sessions/${s.id}`, { method: 'DELETE' });
+                            if (activeSession?.id === s.id) setActiveSession(null);
+                            await fetchSessions();
+                          }}
+                          className="px-3 py-2 text-xs font-bold text-white bg-red-500 hover:bg-red-600 transition-colors border-l border-red-200"
+                        >
+                          Sí, cerrar
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex border-t border-slate-100">
+                        <button
+                          onClick={async () => {
+                            await fetch(`${API}/sessions/${s.id}/close`, { method: 'PUT' });
+                            if (activeSession?.id === s.id) setActiveSession(null);
+                            await fetchSessions();
+                          }}
+                          className="flex-1 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 transition-colors"
+                        >
+                          Cerrar caja
+                        </button>
+                        <div className="w-px bg-slate-100" />
+                        <button
+                          onClick={() => setConfirmCloseSession(s.id)}
+                          className="flex-1 py-2 text-xs font-semibold text-red-400 hover:bg-red-50 transition-colors"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
