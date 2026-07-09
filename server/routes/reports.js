@@ -32,8 +32,11 @@ router.get('/daily', (req, res) => {
       const commRow = db.prepare(
         'SELECT COALESCE(SUM(commission_amount), 0) as val FROM sales WHERE sale_date = ?'
       ).get(targetDate);
-      total_comisiones = commRow?.val || 0;
-    } catch { /* columna puede no existir en instancias antiguas */ }
+      total_comisiones = Number(commRow?.val) || 0;
+      console.log(`[REPORTE] fecha=${targetDate} total_comisiones=${total_comisiones} commRow=${JSON.stringify(commRow)}`);
+    } catch (e) {
+      console.log(`[REPORTE] Error al consultar comisiones: ${e.message}`);
+    }
 
     const profitRow = db.prepare(`
       SELECT COALESCE(SUM((si.price - COALESCE(p.cost_price, 0)) * si.quantity), 0) as ganancia
@@ -171,6 +174,37 @@ router.get('/history', (req, res) => {
     `).all(fromDate, toDate);
 
     res.json({ from: fromDate, to: toDate, daily });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET card sales with commission for a given date (diagnostic)
+router.get('/card-sales', (req, res) => {
+  try {
+    const { date } = req.query;
+    const targetDate = date || localDateStr();
+
+    let sales = [];
+    try {
+      sales = db.prepare(`
+        SELECT id, cashier_name, total, commission_rate, commission_amount, terminal_name, created_at
+        FROM sales
+        WHERE sale_date = ? AND payment_method = 'tarjeta'
+        ORDER BY created_at DESC
+      `).all(targetDate);
+    } catch (e) {
+      // commission columns may not exist on older DBs
+      sales = db.prepare(`
+        SELECT id, cashier_name, total, created_at
+        FROM sales
+        WHERE sale_date = ? AND payment_method = 'tarjeta'
+        ORDER BY created_at DESC
+      `).all(targetDate);
+    }
+
+    const totalComision = sales.reduce((s, v) => s + (parseFloat(v.commission_amount) || 0), 0);
+    res.json({ date: targetDate, count: sales.length, total_comisiones: parseFloat(totalComision.toFixed(2)), sales });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BarChart2, TrendingUp, ShoppingBag, Banknote, CreditCard, ArrowLeftRight, Calendar, DollarSign, Percent } from 'lucide-react';
+import { BarChart2, TrendingUp, ShoppingBag, Banknote, CreditCard, ArrowLeftRight, Calendar, DollarSign, Percent, RefreshCw } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 const API = '/api';
@@ -17,8 +17,8 @@ function localDateStr() {
 export default function Reportes() {
   const [daily, setDaily] = useState(null);
   const [history, setHistory] = useState([]);
+  const [cardSales, setCardSales] = useState([]);
   const [date, setDate] = useState(() => {
-    // Persistir la fecha seleccionada entre navegaciones
     return localStorage.getItem('reportes_date') || localDateStr();
   });
   const [loading, setLoading] = useState(true);
@@ -27,13 +27,17 @@ export default function Reportes() {
 
   async function fetchData() {
     setLoading(true);
-    const [dailyRes, historyRes] = await Promise.all([
+    const [dailyRes, historyRes, cardRes] = await Promise.all([
       fetch(`${API}/reports/daily?date=${date}`),
-      fetch(`${API}/reports/history`)
+      fetch(`${API}/reports/history`),
+      fetch(`${API}/reports/card-sales?date=${date}`)
     ]);
-    const [dailyData, historyData] = await Promise.all([dailyRes.json(), historyRes.json()]);
+    const [dailyData, historyData, cardData] = await Promise.all([
+      dailyRes.json(), historyRes.json(), cardRes.json()
+    ]);
     setDaily(dailyData);
     setHistory(historyData.daily || []);
+    setCardSales(cardData.sales || []);
     setLoading(false);
   }
 
@@ -66,6 +70,9 @@ export default function Reportes() {
           <p className="text-slate-500 text-sm">Análisis de ventas e inventario</p>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={fetchData} className="p-2 hover:bg-orange-100 rounded-xl transition-colors" title="Recargar datos">
+            <RefreshCw size={15} className="text-brand-500" />
+          </button>
           <Calendar size={16} className="text-slate-400" />
           <input
             type="date"
@@ -194,6 +201,59 @@ export default function Reportes() {
           </ResponsiveContainer>
         </div>
       )}
+
+      {/* Detalle ventas con tarjeta */}
+      <div className="card">
+        <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
+          <CreditCard size={16} className="text-blue-500" /> Ventas con tarjeta del día
+        </h3>
+        {cardSales.length === 0 ? (
+          <p className="text-slate-400 text-sm text-center py-4">Sin ventas con tarjeta para esta fecha</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-slate-400 border-b border-slate-100">
+                  <th className="pb-2 pr-3">Hora</th>
+                  <th className="pb-2 pr-3">Cajero</th>
+                  <th className="pb-2 pr-3">Terminal</th>
+                  <th className="pb-2 pr-3 text-right">Total</th>
+                  <th className="pb-2 text-right">Comisión</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {cardSales.map(v => (
+                  <tr key={v.id}>
+                    <td className="py-2 pr-3 text-slate-500 font-mono text-xs">
+                      {v.created_at ? v.created_at.slice(11, 16) : '—'}
+                    </td>
+                    <td className="py-2 pr-3 text-slate-700">{v.cashier_name}</td>
+                    <td className="py-2 pr-3">
+                      {v.terminal_name
+                        ? <span className="text-blue-600 font-medium">{v.terminal_name} ({v.commission_rate ?? 0}%)</span>
+                        : <span className="text-slate-300 italic">sin terminal</span>}
+                    </td>
+                    <td className="py-2 pr-3 font-bold text-slate-800 text-right">{fmt(v.total)}</td>
+                    <td className="py-2 text-right">
+                      {(parseFloat(v.commission_amount) || 0) > 0
+                        ? <span className="text-orange-600 font-bold">{fmt(v.commission_amount)}</span>
+                        : <span className="text-slate-300">$0.00</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-orange-200 font-black">
+                  <td colSpan={4} className="pt-2 text-right text-slate-600 text-xs">Total comisiones:</td>
+                  <td className="pt-2 text-right text-orange-600">
+                    {fmt(cardSales.reduce((s, v) => s + (parseFloat(v.commission_amount) || 0), 0))}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

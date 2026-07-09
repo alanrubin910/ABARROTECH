@@ -45,6 +45,7 @@ router.post('/', (req, res) => {
     const productTotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const commAmt = parseFloat(commission_amount) || 0;
     const total = parseFloat((productTotal + commAmt).toFixed(2));
+    console.log(`[VENTA] metodo=${payment_method} productTotal=${productTotal} commAmt=${commAmt} total=${total} terminal=${terminal_name}`);
     const change_given = payment_method === 'efectivo' && cash_received ? Math.max(0, cash_received - total) : 0;
 
     // Verificar stock antes de iniciar la transacción
