@@ -36,12 +36,15 @@ router.get('/:id', (req, res) => {
 
 router.post('/', (req, res) => {
   try {
-    const { session_id, cashier_name, payment_method, items, cash_received, transfer_ref } = req.body;
+    const { session_id, cashier_name, payment_method, items, cash_received, transfer_ref,
+            commission_rate, commission_amount, terminal_name } = req.body;
     if (!cashier_name || !items || items.length === 0) {
       return res.status(400).json({ error: 'Datos de venta incompletos' });
     }
 
-    const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const productTotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const commAmt = parseFloat(commission_amount) || 0;
+    const total = parseFloat((productTotal + commAmt).toFixed(2));
     const change_given = payment_method === 'efectivo' && cash_received ? Math.max(0, cash_received - total) : 0;
 
     // Verificar stock antes de iniciar la transacción
@@ -63,9 +66,11 @@ router.post('/', (req, res) => {
     db.exec('BEGIN');
     try {
       const saleResult = db.prepare(`
-        INSERT INTO sales (session_id, cashier_name, payment_method, total, cash_received, change_given, transfer_ref)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(session_id, cashier_name, payment_method || 'efectivo', total, cash_received || null, change_given, transfer_ref || null);
+        INSERT INTO sales (session_id, cashier_name, payment_method, total, cash_received, change_given, transfer_ref,
+                          commission_rate, commission_amount, terminal_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(session_id, cashier_name, payment_method || 'efectivo', total, cash_received || null, change_given, transfer_ref || null,
+             parseFloat(commission_rate) || 0, commAmt, terminal_name || null);
 
       const saleId = saleResult.lastInsertRowid;
 

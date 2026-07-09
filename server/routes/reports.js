@@ -22,7 +22,8 @@ router.get('/daily', (req, res) => {
         COALESCE(SUM(total), 0) as total_importe,
         COALESCE(SUM(CASE WHEN payment_method = 'efectivo' THEN total ELSE 0 END), 0) as efectivo,
         COALESCE(SUM(CASE WHEN payment_method = 'tarjeta' THEN total ELSE 0 END), 0) as tarjeta,
-        COALESCE(SUM(CASE WHEN payment_method = 'transferencia' THEN total ELSE 0 END), 0) as transferencia
+        COALESCE(SUM(CASE WHEN payment_method = 'transferencia' THEN total ELSE 0 END), 0) as transferencia,
+        COALESCE(SUM(commission_amount), 0) as total_comisiones
       FROM sales WHERE sale_date = ?
     `).get(targetDate);
 

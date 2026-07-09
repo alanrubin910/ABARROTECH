@@ -2,12 +2,18 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Scan, Grid3X3, Plus, Minus, Trash2, CreditCard, Banknote,
   ArrowLeftRight, CheckCircle, UserCircle, X, ShoppingBag,
-  Search, Camera, ChevronUp, Store, AlertTriangle, Scale
+  Search, Camera, ChevronUp, Store, AlertTriangle, Scale, Settings, Percent
 } from 'lucide-react';
 import Modal from '../components/Modal.jsx';
 import CameraScanner from '../components/CameraScanner.jsx';
 import WeightCalculator from '../components/WeightCalculator.jsx';
 import { useIsMobile } from '../hooks/useIsMobile.js';
+
+const DEFAULT_TERMINALS = [
+  { id: 1, name: 'BBVA',          rate: 2.5  },
+  { id: 2, name: 'Clip',          rate: 3.6  },
+  { id: 3, name: 'Mercado Pago',  rate: 3.49 },
+];
 
 function fmtKg(qty) {
   const grams = Math.round(qty * 1000);
@@ -88,6 +94,17 @@ export default function POS() {
   const [cashInput, setCashInput] = useState('');
   const [cashierName, setCashierName] = useState('');
   const [openingCash, setOpeningCash] = useState('');
+
+  // Terminales y comisiones
+  const [terminals, setTerminals] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pos_terminals');
+      return saved ? JSON.parse(saved) : DEFAULT_TERMINALS;
+    } catch { return DEFAULT_TERMINALS; }
+  });
+  const [selectedTerminal, setSelectedTerminal] = useState(null);
+  const [showTerminalManager, setShowTerminalManager] = useState(false);
+  const [newTerminalForm, setNewTerminalForm] = useState({ name: '', rate: '' });
   const scanRef = useRef(null);
   const scanLockRef = useRef(false); // evita doble procesamiento de un mismo scan
 
@@ -95,10 +112,8 @@ export default function POS() {
   // Kg items cuentan como 1 línea; piezas cuentan por cantidad
   const itemCount = ticket.reduce((s, i) => s + (i.unit === 'kg' ? 1 : i.quantity), 0);
 
-  // Guardar ticket en localStorage cada vez que cambia
-  useEffect(() => {
-    localStorage.setItem('pos_ticket', JSON.stringify(ticket));
-  }, [ticket]);
+  useEffect(() => { localStorage.setItem('pos_ticket', JSON.stringify(ticket)); }, [ticket]);
+  useEffect(() => { localStorage.setItem('pos_terminals', JSON.stringify(terminals)); }, [terminals]);
 
   useEffect(() => { fetchProducts(); fetchSessions(); }, []);
 
@@ -243,7 +258,10 @@ export default function POS() {
         cashier_name: activeSession.cashier_name,
         payment_method: payMethod,
         items: ticket,
-        cash_received: payMethod === 'efectivo' ? cashReceived : null
+        cash_received: payMethod === 'efectivo' ? cashReceived : null,
+        commission_rate:   payMethod === 'tarjeta' && selectedTerminal ? selectedTerminal.rate : 0,
+        commission_amount: payMethod === 'tarjeta' ? commission : 0,
+        terminal_name:     payMethod === 'tarjeta' && selectedTerminal ? selectedTerminal.name : null
       })
     });
     const sale = await r.json();
@@ -271,6 +289,7 @@ export default function POS() {
     if (ticket.length === 0) return;
     setPayMethod('efectivo');
     setCashInput('');
+    if (!selectedTerminal && terminals.length > 0) setSelectedTerminal(terminals[0]);
     setShowPayModal(true);
   }
 
@@ -282,6 +301,10 @@ export default function POS() {
   });
 
   const change = payMethod === 'efectivo' ? Math.max(0, (parseFloat(cashInput) || 0) - total) : 0;
+  const commission = payMethod === 'tarjeta' && selectedTerminal
+    ? parseFloat((total * selectedTerminal.rate / 100).toFixed(2))
+    : 0;
+  const totalConComision = parseFloat((total + commission).toFixed(2));
 
   /* ── RENDER ─────────────────────────────────────────────── */
   return (
@@ -575,6 +598,68 @@ export default function POS() {
           MODALES
       ══════════════════════════════════════════════ */}
 
+      {/* Gestión de terminales */}
+      <Modal open={showTerminalManager} onClose={() => { setShowTerminalManager(false); setNewTerminalForm({ name: '', rate: '' }); }} title="Mis terminales" size="sm">
+        <div className="space-y-4">
+          {terminals.length === 0 ? (
+            <p className="text-slate-400 text-sm text-center py-3">Sin terminales. Agrega una abajo.</p>
+          ) : (
+            <div className="space-y-2">
+              {terminals.map(t => (
+                <div key={t.id} className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3 border border-slate-100">
+                  <div>
+                    <p className="font-bold text-slate-800">{t.name}</p>
+                    <p className="text-xs text-slate-500 flex items-center gap-0.5"><Percent size={10} />{t.rate} comisión</p>
+                  </div>
+                  <button onClick={() => {
+                    setTerminals(prev => prev.filter(x => x.id !== t.id));
+                    if (selectedTerminal?.id === t.id) setSelectedTerminal(null);
+                  }} className="p-1.5 hover:bg-red-100 text-red-400 hover:text-red-600 rounded-lg transition-colors">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="border border-slate-200 rounded-xl p-3 space-y-2 bg-orange-50/40">
+            <p className="text-sm font-bold text-slate-600">Agregar terminal</p>
+            <div className="flex gap-2">
+              <input
+                value={newTerminalForm.name}
+                onChange={e => setNewTerminalForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="Nombre (ej: BBVA)"
+                className="input flex-1 text-sm"
+              />
+              <div className="relative w-24 flex-shrink-0">
+                <input
+                  value={newTerminalForm.rate}
+                  onChange={e => setNewTerminalForm(f => ({ ...f, rate: e.target.value }))}
+                  type="number" step="0.01" placeholder="3.5"
+                  className="input text-sm text-center pr-5"
+                />
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">%</span>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                const name = newTerminalForm.name.trim();
+                const rate = parseFloat(newTerminalForm.rate);
+                if (!name || !rate || rate <= 0) return;
+                const t = { id: Date.now(), name, rate };
+                setTerminals(prev => [...prev, t]);
+                if (!selectedTerminal) setSelectedTerminal(t);
+                setNewTerminalForm({ name: '', rate: '' });
+              }}
+              disabled={!newTerminalForm.name.trim() || !newTerminalForm.rate}
+              className="btn-primary w-full text-sm py-2 disabled:opacity-50"
+            >
+              Agregar terminal
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Calculadora de peso */}
       <Modal open={!!weightProduct} onClose={() => setWeightProduct(null)} title="Venta por peso" size="sm">
         {weightProduct && (
@@ -672,8 +757,62 @@ export default function POS() {
           </div>
 
           {payMethod === 'tarjeta' && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700 font-medium">
-              Cobra con tu terminal. El sistema registra el pago con tarjeta.
+            <div className="space-y-2.5">
+              {/* Selector de terminal */}
+              <div className="flex items-center justify-between">
+                <label className="label mb-0">Terminal</label>
+                <button onClick={() => setShowTerminalManager(true)}
+                  className="text-xs text-brand-600 hover:text-brand-800 font-semibold flex items-center gap-1">
+                  <Settings size={12} /> Gestionar
+                </button>
+              </div>
+              {terminals.length === 0 ? (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+                  <p className="text-slate-400 text-sm mb-2">No hay terminales configuradas</p>
+                  <button onClick={() => setShowTerminalManager(true)} className="btn-secondary text-sm py-1.5">
+                    + Agregar terminal
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-1.5">
+                  {terminals.map(t => (
+                    <button key={t.id} onClick={() => setSelectedTerminal(t)}
+                      className={`flex items-center justify-between px-4 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                        selectedTerminal?.id === t.id
+                          ? 'border-brand-500 bg-orange-50 text-brand-700'
+                          : 'border-slate-200 text-slate-600 hover:border-brand-300'
+                      }`}>
+                      <span>{t.name}</span>
+                      <span className={`font-mono flex items-center gap-0.5 ${selectedTerminal?.id === t.id ? 'text-brand-500' : 'text-slate-400'}`}>
+                        <Percent size={11} />{t.rate}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Desglose de comisión */}
+              {selectedTerminal && commission > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-1.5">
+                  <div className="flex justify-between text-sm text-slate-500">
+                    <span>Subtotal productos</span>
+                    <span>{fmt(total)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-bold text-orange-700">
+                    <span className="flex items-center gap-1">
+                      <Percent size={12} /> Comisión {selectedTerminal.name} ({selectedTerminal.rate}%)
+                    </span>
+                    <span>+ {fmt(commission)}</span>
+                  </div>
+                  <div className="flex justify-between font-black text-brand-700 text-base pt-1.5 border-t border-orange-200">
+                    <span>Total a cobrar</span>
+                    <span>{fmt(totalConComision)}</span>
+                  </div>
+                </div>
+              )}
+              {!selectedTerminal && (
+                <p className="text-xs text-slate-400 text-center">Selecciona una terminal para calcular la comisión</p>
+              )}
             </div>
           )}
           {payMethod === 'transferencia' && (
@@ -700,7 +839,7 @@ export default function POS() {
           <button onClick={completeSale}
             disabled={payMethod === 'efectivo' && cashInput !== '' && parseFloat(cashInput) < total}
             className="btn-success w-full text-base py-3 disabled:opacity-50 disabled:cursor-not-allowed">
-            Confirmar venta
+            Confirmar · {fmt(payMethod === 'tarjeta' && commission > 0 ? totalConComision : total)}
           </button>
         </div>
       </Modal>
@@ -714,6 +853,11 @@ export default function POS() {
             <p className="text-3xl font-black text-brand-500 mt-1">{fmt(lastSale?.total || 0)}</p>
             {lastSale?.change_given > 0 && (
               <p className="text-sm text-slate-500 mt-1">Cambio: {fmt(lastSale.change_given)}</p>
+            )}
+            {lastSale?.commission_amount > 0 && (
+              <p className="text-xs text-orange-500 font-semibold mt-1">
+                Incl. comisión {lastSale.terminal_name}: {fmt(lastSale.commission_amount)}
+              </p>
             )}
             <span className={`mt-2 text-xs font-bold inline-block px-3 py-1 rounded-full ${
               lastSale?.payment_method === 'efectivo' ? 'bg-green-100 text-green-700' :

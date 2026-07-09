@@ -105,7 +105,10 @@ db.exec(`
   );
 `);
 
-// Migración: agregar columna cost_price si no existe
+// Migraciones incrementales (seguras si ya existen)
 try { db.exec('ALTER TABLE products ADD COLUMN cost_price REAL DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE sales ADD COLUMN commission_rate REAL DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE sales ADD COLUMN commission_amount REAL DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE sales ADD COLUMN terminal_name TEXT'); } catch {}
 
 module.exports = db;
