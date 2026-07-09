@@ -596,7 +596,7 @@ export default function POS() {
       ══════════════════════════════════════════════ */}
 
       {/* Gestión de terminales */}
-      <Modal open={showTerminalManager} onClose={() => { setShowTerminalManager(false); setNewTerminalForm({ name: '', rate: '' }); setEditingTerminal(null); }} title="Mis terminales" size="sm">
+      <Modal open={showTerminalManager} onClose={() => { setShowTerminalManager(false); setNewTerminalForm({ name: '', rate: '' }); setEditingTerminal(null); }} title="Mis terminales" size="sm" layer="top">
         <div className="space-y-3">
           {terminals.length === 0 ? (
             <p className="text-slate-400 text-sm text-center py-3">Aún no tienes terminales. Agrega una abajo.</p>
