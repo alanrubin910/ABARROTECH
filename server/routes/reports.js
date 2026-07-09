@@ -49,8 +49,8 @@ router.get('/daily', (req, res) => {
     const topProducts = db.prepare(`
       SELECT
         si.product_name,
-        SUM(si.quantity) as total_piezas,
-        SUM(si.subtotal) as total_importe
+        ROUND(SUM(si.quantity), 3) as total_piezas,
+        ROUND(SUM(si.subtotal), 2) as total_importe
       FROM sale_items si
       JOIN sales s ON si.sale_id = s.id
       WHERE s.sale_date = ?
